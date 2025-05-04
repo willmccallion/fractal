@@ -1,12 +1,13 @@
-use crate::input::{get_mandeltbrot_param, get_julia_param};
-
 use image::{ImageBuffer, Rgb, RgbImage};
 
 const IMAGE_H: f64 = 1440.0;
-pub fn mandelbrot(max_recursion: u32) -> RgbImage {
-    println!("Generating Mandelbrot with max recursion: {}", max_recursion);
-    let (real_center, imaginary_center, zoom_factor) = get_mandeltbrot_param();
 
+pub fn mandelbrot(
+    max_recursion: u32,
+    real_center: f64,
+    imaginary_center: f64,
+    zoom_factor: f64,
+) -> RgbImage {
     let image_w = (3.0 * IMAGE_H) / 2.0;
     let image_w_int = image_w as i32;
     let image_h_int = IMAGE_H as i32;
@@ -31,7 +32,14 @@ pub fn mandelbrot(max_recursion: u32) -> RgbImage {
             let re_c = real_center + ((x_pixel / zoom_factor) + 0.5) * scale;
             let im_c = imaginary_center + ((y_pixel / zoom_factor) - 0.5) * scale;
 
-            let depth = recursive_fractal_sequence(re_c, im_c, initial_re_z, initial_im_z, 0, max_iterations);
+            let depth = recursive_fractal_sequence(
+                re_c,
+                im_c,
+                initial_re_z,
+                initial_im_z,
+                0,
+                max_iterations,
+            );
 
             let red: u8;
             let green: u8;
@@ -57,15 +65,12 @@ pub fn mandelbrot(max_recursion: u32) -> RgbImage {
     img
 }
 
-pub fn julia(max_recursion: u32) -> RgbImage {
-    println!("Generating Julia with max recursion: {}", max_recursion);
-    let (re_c, im_c) = get_julia_param();
-
+pub fn julia(max_recursion: u32, re_c: f64, im_c: f64) -> RgbImage {
     let image_w = (4.0 * IMAGE_H) / 3.0;
     let image_w_int = image_w as i32;
     let image_h_int = IMAGE_H as i32;
 
-    let scale = 3.0 /  IMAGE_H ;
+    let scale = 3.0 / IMAGE_H;
 
     let mut img = ImageBuffer::new(image_w as u32, IMAGE_H as u32);
 
@@ -107,7 +112,14 @@ pub fn julia(max_recursion: u32) -> RgbImage {
     img
 }
 
-fn recursive_fractal_sequence(re_c: f64, im_c: f64, re_z: f64, im_z: f64, depth: usize, max_iterations: usize) -> usize {
+fn recursive_fractal_sequence(
+    re_c: f64,
+    im_c: f64,
+    re_z: f64,
+    im_z: f64,
+    depth: usize,
+    max_iterations: usize,
+) -> usize {
     if depth >= max_iterations || (re_z * re_z + im_z * im_z) > 4.0 {
         return depth;
     }
@@ -117,3 +129,4 @@ fn recursive_fractal_sequence(re_c: f64, im_c: f64, re_z: f64, im_z: f64, depth:
 
     recursive_fractal_sequence(re_c, im_c, new_re_z, new_im_z, depth + 1, max_iterations)
 }
+
