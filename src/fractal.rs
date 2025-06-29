@@ -1,6 +1,8 @@
 use image::{ImageBuffer, Rgb, RgbImage};
+use rayon::prelude::*;
 
-const IMAGE_H: f64 = 1440.0;
+const IMAGE_W: f64 = 4096.0;
+const IMAGE_H: f64 = 2160.0;
 
 pub fn mandelbrot(
     max_recursion: u32,
@@ -8,78 +10,43 @@ pub fn mandelbrot(
     imaginary_center: f64,
     zoom_factor: f64,
 ) -> RgbImage {
-    let image_w = (3.0 * IMAGE_H) / 2.0;
-    let image_w_int = image_w as i32;
-    let image_h_int = IMAGE_H as i32;
+    let mut img = ImageBuffer::new(IMAGE_W as u32, IMAGE_H as u32);
 
-    let scale = 2.0 / IMAGE_H;
-
-    let initial_re_z: f64 = 0.0;
-    let initial_im_z: f64 = 0.0;
-
-    let mut img = ImageBuffer::new(image_w as u32, IMAGE_H as u32);
-
+    let scale = 2.0 / IMAGE_H as f64;
     let max_iterations = max_recursion as usize;
 
-    for img_x in 0..(image_w as usize) {
-        for img_y in 0..(IMAGE_H as usize) {
-            let x_pixel_int = img_x as i32 - image_w_int / 2;
-            let y_pixel_int = image_h_int / 2 - 1 - img_y as i32;
+    img.par_enumerate_pixels_mut()
+        .for_each(|(img_x, img_y, pixel)| {
+            let x_pixel = img_x as f64 - (IMAGE_W as f64 / 2.0);
+            let y_pixel = (IMAGE_H as f64 / 2.0) - 1.0 - img_y as f64;
 
-            let x_pixel = x_pixel_int as f64;
-            let y_pixel = y_pixel_int as f64;
+            let re_c = real_center + (x_pixel / zoom_factor) * scale;
+            let im_c = imaginary_center + (y_pixel / zoom_factor) * scale;
 
-            let re_c = real_center + ((x_pixel / zoom_factor) + 0.5) * scale;
-            let im_c = imaginary_center + ((y_pixel / zoom_factor) - 0.5) * scale;
+            let depth = recursive_fractal_sequence(re_c, im_c, 0.0, 0.0, 0, max_iterations);
 
-            let depth = recursive_fractal_sequence(
-                re_c,
-                im_c,
-                initial_re_z,
-                initial_im_z,
-                0,
-                max_iterations,
-            );
-
-            let red: u8;
-            let green: u8;
-            let blue: u8;
-
-            if depth >= max_iterations {
-                red = 255;
-                green = 255;
-                blue = 255;
+            let color = if depth >= max_iterations {
+                Rgb([0, 0, 0])
             } else {
                 let alpha = depth as f64 / max_iterations as f64;
-                red = 0;
-                green = (alpha * 255.0) as u8;
-                blue = (alpha * 153.0) as u8;
-            }
+                Rgb([0, (alpha * 255.0) as u8, (alpha * 153.0) as u8])
+            };
 
-            let pixel = Rgb([red, green, blue]);
-
-            img.put_pixel(img_x as u32, img_y as u32, pixel);
-        }
-    }
+            *pixel = color;
+        });
 
     img
 }
-
 pub fn julia(max_recursion: u32, re_c: f64, im_c: f64) -> RgbImage {
-    let image_w = (4.0 * IMAGE_H) / 3.0;
-    let image_w_int = image_w as i32;
-    let image_h_int = IMAGE_H as i32;
+    let mut img = ImageBuffer::new(IMAGE_W as u32, IMAGE_H as u32);
 
-    let scale = 3.0 / IMAGE_H;
-
-    let mut img = ImageBuffer::new(image_w as u32, IMAGE_H as u32);
-
+    let scale = 3.0 / IMAGE_H as f64;
     let max_iterations = max_recursion as usize;
 
-    for img_x in 0..(image_w as usize) {
-        for img_y in 0..(IMAGE_H as usize) {
-            let x_pixel_int = img_x as i32 - image_w_int / 2;
-            let y_pixel_int = image_h_int / 2 - 1 - img_y as i32;
+    img.par_enumerate_pixels_mut()
+        .for_each(|(img_x, img_y, pixel)| {
+            let x_pixel_int = img_x as i32 - IMAGE_W as i32 / 2;
+            let y_pixel_int = IMAGE_H as i32 / 2 - 1 - img_y as i32;
 
             let x_pixel = x_pixel_int as f64;
             let y_pixel = y_pixel_int as f64;
@@ -88,26 +55,15 @@ pub fn julia(max_recursion: u32, re_c: f64, im_c: f64) -> RgbImage {
             let im_z = y_pixel * scale;
             let depth = recursive_fractal_sequence(re_c, im_c, re_z, im_z, 0, max_iterations);
 
-            let red: u8;
-            let green: u8;
-            let blue: u8;
-
-            if depth >= max_iterations {
-                red = 255;
-                green = 255;
-                blue = 255;
+            let (red, green, blue) = if depth >= max_iterations {
+                (255, 255, 255)
             } else {
                 let alpha = depth as f64 / max_iterations as f64;
-                red = 0;
-                green = (alpha * 255.0) as u8;
-                blue = (alpha * 153.0) as u8;
-            }
+                (0, (alpha * 255.0) as u8, (alpha * 153.0) as u8)
+            };
 
-            let pixel = Rgb([red, green, blue]);
-
-            img.put_pixel(img_x as u32, img_y as u32, pixel);
-        }
-    }
+            *pixel = Rgb([red, green, blue]);
+        });
 
     img
 }
@@ -129,4 +85,3 @@ fn recursive_fractal_sequence(
 
     recursive_fractal_sequence(re_c, im_c, new_re_z, new_im_z, depth + 1, max_iterations)
 }
-
