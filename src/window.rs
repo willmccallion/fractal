@@ -15,7 +15,7 @@ struct Uniforms {
     _padding: [u32; 3],
 }
 
-const INITIAL_ITERATIONS: i32 = 128;
+const INITIAL_ITERATIONS: i32 = 500;
 
 pub async fn run_window() {
     let event_loop = EventLoop::new();
@@ -230,6 +230,11 @@ pub async fn run_window() {
                     MouseButton::Right => 2.0,
                     _ => return,
                 };
+                let min_zoom_range = 6.2e-5;
+                if zoom_factor < 1.0 && uniforms.range[0] < min_zoom_range {
+                    println!("Zoom limit reached.");
+                    return;
+                }
 
                 let norm_x = (mouse_pos.x as f32 / config.width as f32) - 0.5;
                 let norm_y = (mouse_pos.y as f32 / config.height as f32) - 0.5;
