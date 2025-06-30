@@ -1,7 +1,7 @@
 use bytemuck;
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, Event, MouseButton, WindowEvent},
+    event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
@@ -20,7 +20,7 @@ const INITIAL_ITERATIONS: i32 = 500;
 pub async fn run_window() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Mandelbrot - True High-Quality Zoom")
+        .with_title("Mandelbrot - Pan & Zoom")
         .build(&event_loop)
         .unwrap();
 
@@ -70,6 +70,8 @@ pub async fn run_window() {
     queue.write_buffer(&uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
 
     let mut mouse_pos = PhysicalPosition::new(0.0, 0.0);
+    let mut last_mouse_pos = PhysicalPosition::new(0.0, 0.0);
+    let mut panning = false;
 
     let mut storage_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Mandelbrot Storage Texture"),
@@ -218,21 +220,40 @@ pub async fn run_window() {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 mouse_pos = position;
-            }
+                if panning {
+                    let dx = mouse_pos.x - last_mouse_pos.x;
+                    let dy = mouse_pos.y - last_mouse_pos.y;
 
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button,
-                ..
-            } => {
-                let zoom_factor = match button {
-                    MouseButton::Left => 0.5,
-                    MouseButton::Right => 2.0,
-                    _ => return,
+                    let delta_complex_x = (dx as f32 / config.width as f32) * uniforms.range[0];
+                    let delta_complex_y = (dy as f32 / config.height as f32) * uniforms.range[1];
+
+                    uniforms.center[0] -= delta_complex_x;
+                    uniforms.center[1] -= delta_complex_y;
+
+                    last_mouse_pos = mouse_pos;
+
+                    queue.write_buffer(&uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scroll = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y,
+                    MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => y as f32,
                 };
-                let min_zoom_range = 6.2e-5;
+
+                if scroll == 0.0 {
+                    return;
+                }
+
+                let zoom_factor = if scroll > 0.0 { 1.0 / 1.1 } else { 1.1 };
+
+                let min_zoom_range = 1.0e-14;
                 if zoom_factor < 1.0 && uniforms.range[0] < min_zoom_range {
                     println!("Zoom limit reached.");
+                    return;
+                }
+                if zoom_factor > 1.0 && uniforms.range[0] > 5.0 {
                     return;
                 }
 
@@ -240,25 +261,33 @@ pub async fn run_window() {
                 let norm_y = (mouse_pos.y as f32 / config.height as f32) - 0.5;
 
                 let mouse_complex_x = uniforms.center[0] + norm_x * uniforms.range[0];
-                let mouse_complex_y = uniforms.center[1] - norm_y * uniforms.range[1];
+                let mouse_complex_y = uniforms.center[1] + norm_y * uniforms.range[1];
 
                 uniforms.range[0] *= zoom_factor;
                 uniforms.range[1] *= zoom_factor;
 
                 uniforms.center[0] = mouse_complex_x - norm_x * uniforms.range[0];
-                uniforms.center[1] = mouse_complex_y + norm_y * uniforms.range[1];
+                uniforms.center[1] = mouse_complex_y - norm_y * uniforms.range[1];
 
                 uniforms.max_iter = (INITIAL_ITERATIONS as f32
                     * (3.5 / uniforms.range[0]).powf(0.3))
                 .clamp(128.0, 5000.0) as i32;
 
-                println!(
-                    "Zooming to center: {:?}, range: {:?}, iterations: {}",
-                    uniforms.center, uniforms.range, uniforms.max_iter,
-                );
-
                 queue.write_buffer(&uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
                 window.request_redraw();
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == MouseButton::Left {
+                    match state {
+                        ElementState::Pressed => {
+                            panning = true;
+                            last_mouse_pos = mouse_pos;
+                        }
+                        ElementState::Released => {
+                            panning = false;
+                        }
+                    }
+                }
             }
             _ => {}
         },
