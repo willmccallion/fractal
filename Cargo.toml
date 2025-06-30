@@ -9,3 +9,4 @@ rayon = "*"
 winit = "0.28"
 wgpu = "0.17"
 pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
