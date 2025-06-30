@@ -20,7 +20,7 @@ const INITIAL_ITERATIONS: i32 = 500;
 pub async fn run_window() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Mandelbrot - Pan & Zoom")
+        .with_title("Mandelbrot")
         .build(&event_loop)
         .unwrap();
 
@@ -248,7 +248,7 @@ pub async fn run_window() {
 
                 let zoom_factor = if scroll > 0.0 { 1.0 / 1.1 } else { 1.1 };
 
-                let min_zoom_range = 1.0e-14;
+                let min_zoom_range = 1.0e-4;
                 if zoom_factor < 1.0 && uniforms.range[0] < min_zoom_range {
                     println!("Zoom limit reached.");
                     return;
