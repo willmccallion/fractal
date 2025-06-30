@@ -1,10 +1,34 @@
 struct Uniforms {
     center: vec2<f32>,
     range: vec2<f32>,
+    max_iter: i32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(1) @binding(0) var storage_texture: texture_storage_2d<rgba8unorm, write>;
+
+fn hsv2rgb(hsv: vec3<f32>) -> vec3<f32> {
+    let c = hsv.z * hsv.y;
+    let h = hsv.x * 6.0;
+    let x = c * (1.0 - abs(h % 2.0 - 1.0));
+    var rgb: vec3<f32>;
+
+    if (h < 1.0) {
+        rgb = vec3<f32>(c, x, 0.0);
+    } else if (h < 2.0) {
+        rgb = vec3<f32>(x, c, 0.0);
+    } else if (h < 3.0) {
+        rgb = vec3<f32>(0.0, c, x);
+    } else if (h < 4.0) {
+        rgb = vec3<f32>(0.0, x, c);
+    } else if (h < 5.0) {
+        rgb = vec3<f32>(x, 0.0, c);
+    } else {
+        rgb = vec3<f32>(c, 0.0, x);
+    }
+
+    return rgb + vec3<f32>(hsv.z - c);
+}
 
 @compute @workgroup_size(8, 8)
 fn main_compute(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -13,25 +37,29 @@ fn main_compute(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let normalized_coords = vec2<f32>(f32(global_id.x), f32(global_id.y)) / vec2<f32>(dims);
     let complex_coords = uniforms.center + (normalized_coords - 0.5) * uniforms.range;
-    let cx = complex_coords.x;
-    let cy = complex_coords.y;
+    let c = complex_coords;
 
-    let max_iter = 128;
-    var zx = 0.0;
-    var zy = 0.0;
+    let max_iter = uniforms.max_iter;
+    var z = vec2<f32>(0.0, 0.0);
     var i = 0;
 
-    while (zx * zx + zy * zy < 4.0 && i < max_iter) {
-        let xtemp = zx * zx - zy * zy + cx;
-        zy = 2.0 * zx * zy + cy;
-        zx = xtemp;
+    while (dot(z, z) < 4.0 && i < max_iter) {
+        z = vec2<f32>(
+            z.x * z.x - z.y * z.y + c.x,
+            2.0 * z.x * z.y + c.y
+        );
         i = i + 1;
     }
+
     var color: vec4<f32>;
     if (i == max_iter) {
         color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     } else {
-        color = vec4<f32>(f32(i * 5) / 255.0, f32(i * 2) / 255.0, f32(i * 8) / 255.0, 1.0);
+        let i_f = f32(i);
+        let hue = (i_f / 64.0) % 1.0;
+        let saturation = 0.8;
+        let value = i_f / f32(max_iter);
+        color = vec4<f32>(hsv2rgb(vec3(hue, saturation, value)), 1.0);
     }
 
     textureStore(storage_texture, global_id.xy, color);

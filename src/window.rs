@@ -11,12 +11,16 @@ use winit::{
 struct Uniforms {
     center: [f32; 2],
     range: [f32; 2],
+    max_iter: i32,
+    _padding: [u32; 3],
 }
+
+const INITIAL_ITERATIONS: i32 = 128;
 
 pub async fn run_window() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Mandelbrot - Click to Zoom")
+        .with_title("Mandelbrot - True High-Quality Zoom")
         .build(&event_loop)
         .unwrap();
 
@@ -54,6 +58,8 @@ pub async fn run_window() {
     let mut uniforms = Uniforms {
         center: [-0.75, 0.0],
         range: [3.5, 2.0],
+        max_iter: INITIAL_ITERATIONS,
+        _padding: [0; 3],
     };
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Uniform Buffer"),
@@ -202,30 +208,50 @@ pub async fn run_window() {
                             | wgpu::TextureUsages::TEXTURE_BINDING,
                         view_formats: &[],
                     });
+
+                    let aspect_ratio = config.width as f32 / config.height as f32;
+                    uniforms.range[1] = uniforms.range[0] / aspect_ratio;
+                    queue.write_buffer(&uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
                     window.request_redraw();
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 mouse_pos = position;
             }
+
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
-                button: MouseButton::Left,
+                button,
                 ..
             } => {
+                let zoom_factor = match button {
+                    MouseButton::Left => 0.5,
+                    MouseButton::Right => 2.0,
+                    _ => return,
+                };
+
                 let norm_x = (mouse_pos.x as f32 / config.width as f32) - 0.5;
                 let norm_y = (mouse_pos.y as f32 / config.height as f32) - 0.5;
 
-                uniforms.center[0] += norm_x * uniforms.range[0];
-                uniforms.center[1] -= norm_y * uniforms.range[1];
+                let mouse_complex_x = uniforms.center[0] + norm_x * uniforms.range[0];
+                let mouse_complex_y = uniforms.center[1] - norm_y * uniforms.range[1];
 
-                uniforms.range[0] *= 0.5;
-                uniforms.range[1] *= 0.5;
+                uniforms.range[0] *= zoom_factor;
+                uniforms.range[1] *= zoom_factor;
+
+                uniforms.center[0] = mouse_complex_x - norm_x * uniforms.range[0];
+                uniforms.center[1] = mouse_complex_y + norm_y * uniforms.range[1];
+
+                uniforms.max_iter = (INITIAL_ITERATIONS as f32
+                    * (3.5 / uniforms.range[0]).powf(0.3))
+                .clamp(128.0, 5000.0) as i32;
 
                 println!(
-                    "Zooming to center: {:?}, range: {:?}",
-                    uniforms.center, uniforms.range
+                    "Zooming to center: {:?}, range: {:?}, iterations: {}",
+                    uniforms.center, uniforms.range, uniforms.max_iter,
                 );
+
                 queue.write_buffer(&uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
                 window.request_redraw();
             }
@@ -278,6 +304,7 @@ pub async fn run_window() {
             {
                 let mut compute_pass =
                     encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+
                 compute_pass.set_pipeline(&compute_pipeline);
                 compute_pass.set_bind_group(0, &uniform_bind_group, &[]);
                 compute_pass.set_bind_group(1, &storage_bind_group, &[]);
@@ -309,7 +336,6 @@ pub async fn run_window() {
             queue.submit(Some(encoder.finish()));
             frame.present();
         }
-        Event::MainEventsCleared => {}
         _ => {}
     });
 }
