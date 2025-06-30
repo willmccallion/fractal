@@ -1,4 +1,5 @@
 mod fractal;
+mod window;
 
 use std::time::Instant;
 
@@ -18,6 +19,8 @@ fn main() {
         let img = fractal::mandelbrot(1000, -1.0, 0.0, 1.0);
         img.save("images/EXAMPLE.png")
             .expect("Unable to save example fractal");
+
+        pollster::block_on(window::run_window());
 
         std::process::exit(1);
     }

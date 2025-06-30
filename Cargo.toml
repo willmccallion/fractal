@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 image = "0.25.6"
 rayon = "*"
+winit = "0.28"
+wgpu = "0.17"
+pollster = "0.3"
