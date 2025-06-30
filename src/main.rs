@@ -7,11 +7,18 @@ fn main() {
 
     if args.len() < 4 {
         eprintln!(
-            "Usage: {} <output_file> <0|1> <max_iterations> [fractal_params...]",
+            "\n\nUsage: {} <output_file> <0|1> <max_iterations> [fractal_params...]\n",
             args[0]
         );
-        eprintln!("  Choice 0 (Mandelbrot): requires <real_center> <imag_center> <zoom_factor>");
-        eprintln!("  Choice 1 (Julia): requires <re_c> <im_c>");
+        eprintln!("fractal_params:  Choice 0 (Mandelbrot): requires <real_center> <imag_center> <zoom_factor>");
+        eprintln!("fractal_params:  Choice 1 (Julia): requires <re_c> <im_c>\n");
+
+        eprintln!("images/EXAMPLE.png: cargo run --release images/EXAMPLE.png 0 1000 -1.0 0.0 1.0");
+
+        let img = fractal::mandelbrot(1000, -1.0, 0.0, 1.0);
+        img.save("images/EXAMPLE.png")
+            .expect("Unable to save example fractal");
+
         std::process::exit(1);
     }
 

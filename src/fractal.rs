@@ -26,7 +26,7 @@ pub fn mandelbrot(
             let depth = recursive_fractal_sequence(re_c, im_c, 0.0, 0.0, 0, max_iterations);
 
             let color = if depth >= max_iterations {
-                Rgb([0, 0, 0])
+                Rgb([255, 255, 255])
             } else {
                 let alpha = depth as f64 / max_iterations as f64;
                 Rgb([0, (alpha * 255.0) as u8, (alpha * 153.0) as u8])
