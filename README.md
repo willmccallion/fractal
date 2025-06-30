@@ -2,11 +2,13 @@
 
 ## Option 1: Interactive Mandelbrot
 
-* Run cargo run --release
+* Run: **cargo run --release**
 * Mouse wheel to zoom in and out
 * Left click and drag to move around
 
 ## Option 2: Generate image
+
+* Run: **cargo run --release <output_path.png> <set choice> <recursion depth> <set parameters>**
 
 ### Input Parameters
 
